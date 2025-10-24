@@ -8,4 +8,5 @@ anyhow = "1.0.100"
 clap = { version = "4.5.38", features = ["derive"] }
 is_sudo = "0.0.1"
 pcap = "2.3.0"
+pnet = "0.35.0"
 pnet_datalink = "0.35.0"
