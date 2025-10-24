@@ -16,7 +16,26 @@ fn main() -> Result<()> {
     let target_ip: IpAddr = target_ip.parse()?;
     let gateway_ip: IpAddr = gateway_ip.parse()?;
 
+    let network_interface = match get_network_interface(&interface) {
+        Some(iface) => iface,
+        None => {
+            println!("Network interface '{}' not found.", interface);
+            std::process::exit(1);
+        }
+    };
+    // dbg!(network_interface);
+
     Ok(())
+}
+
+fn get_network_interface(iface: &str) -> Option<pnet_datalink::NetworkInterface> {
+    let interfaces = pnet_datalink::interfaces();
+    for interface in interfaces {
+        if interface.name == iface {
+            return Some(interface);
+        }
+    }
+    None
 }
 
 fn check_sudo() -> bool {
