@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 mod cli;
-use std::net::IpAddr;
+use pcap::Device;
+use std::net::{IpAddr, Ipv4Addr};
 
 fn main() -> Result<()> {
     if !check_sudo() {
@@ -23,7 +24,26 @@ fn main() -> Result<()> {
             std::process::exit(1);
         }
     };
-    // dbg!(network_interface);
+    // dbg!(&network_interface);
+
+    let pcap_device = match Device::list()?
+        .into_iter()
+        .find(|d| d.name == network_interface.name)
+    {
+        Some(dev) => dev,
+        None => {
+            println!(
+                "PCAP device for interface '{}' not found.",
+                network_interface.name
+            );
+            std::process::exit(1);
+        }
+    };
+    // dbg!(&pcap_device);
+
+    let self_ip = pcap_device.ip_addr();
+    let self_mac = network_interface.mac.unwrap();
+    // dbg!(self_mac);
 
     Ok(())
 }
@@ -36,6 +56,22 @@ fn get_network_interface(iface: &str) -> Option<pnet_datalink::NetworkInterface>
         }
     }
     None
+}
+
+trait GetDetails {
+    fn ip_addr(&self) -> Option<Ipv4Addr>;
+}
+
+impl GetDetails for pcap::Device {
+    fn ip_addr(&self) -> Option<Ipv4Addr> {
+        self.addresses
+            .iter()
+            .filter_map(|i| match i.addr {
+                IpAddr::V4(ipv4) => Some(ipv4),
+                _ => None,
+            })
+            .next_back()
+    }
 }
 
 fn check_sudo() -> bool {
