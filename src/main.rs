@@ -67,6 +67,8 @@ fn main() -> Result<()> {
     let gateway_mac = arp_spoofer.find_gateway_mac();
     arp_spoofer.gateway_mac = gateway_mac;
 
+    arp_spoofer.send_poisoned_req();
+
     Ok(())
 }
 
