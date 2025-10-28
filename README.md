@@ -28,19 +28,15 @@
 - **Root/Admin Privileges**: Required for raw socket access and IP forwarding control
 - **Network Interface**: Must know the name of your network interface (e.g., `en0` (macos), `eth0` (linux))
 
-## Building
-
+## Installation
 ```bash
-git clone https://github.com/arjav0703/arp-spoofer.git && cd arp-spoofer
-cargo build --release https://github.com/arjav0703/arp-spoofer.git
+cargo install arp-spoofer-cli
 ```
-
-The binary will be created at `target/release/arp-spoofer`
 
 ## Usage
 
 ```bash
-sudo ./target/release/arp-spoofer \
+sudo arp-spoofer-cli \
   --interface <INTERFACE> \
   --target <TARGET_IP> \
   --gateway <GATEWAY_IP>
@@ -56,10 +52,10 @@ sudo ./target/release/arp-spoofer \
 **This may vary on your machine**
 ```bash
 # On macOS
-sudo ./target/release/arp-spoofer -i en0 -t 192.168.1.100 -g 192.168.1.1
+sudo arp-spoofer-cli -i en0 -t 192.168.1.100 -g 192.168.1.1
 
 # On Linux
-sudo ./target/release/arp-spoofer -i eth0 -t 192.168.1.100 -g 192.168.1.1
+sudo arp-spoofer-cli -i eth0 -t 192.168.1.100 -g 192.168.1.1
 ```
 
 ### Finding Your Interface
