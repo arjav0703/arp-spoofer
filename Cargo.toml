@@ -2,7 +2,7 @@
 name = "arp-spoofer-cli"
 description = "A command-line tool for ARP spoofing attacks."
 license = "MIT"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Arjav Jain <arjavjain0703@gmail.com>"]
 repository = "https://github.com/arjav0703/arp-spoofer"
 edition = "2024"
